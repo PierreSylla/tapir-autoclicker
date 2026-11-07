@@ -68,7 +68,7 @@ On Hyprland, Tapir never reads your keyboard. The evdev fallback for other compo
 
 Set the interval, button, click type and repeat mode, then press **Start**. The status line shows *Stopped*, *Starting in N s* or *Running*, and the counter shows the clicks of the current session. In "Repeat N times" mode the session stops on its own.
 
-The settings are locked while a session runs. When a tray is available, closing the window hides it to the tray; **Quit** is in the tray menu. Without a tray, closing the window quits.
+The settings are locked while a session runs. When a tray is available, closing the window (the **✕** button or your compositor's close shortcut) hides it to the tray; **Quit** is in the tray menu. Without a tray, closing the window quits.
 
 ## Global hotkey
 

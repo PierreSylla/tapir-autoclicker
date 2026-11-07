@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QSpinBox,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -141,6 +142,15 @@ class MainWindow(QWidget):
         )
 
     def _build(self) -> None:
+        # Hyprland draws no title bar, so the window brings its own close button.
+        # A glyph rather than a theme icon: it follows the text colour, theme icons can be dark on dark.
+        close = QToolButton(text="✕", autoRaise=True)
+        close.setToolTip("Close")
+        close.clicked.connect(self.close)
+        header = QHBoxLayout()
+        header.addStretch(1)
+        header.addWidget(close)
+
         self.settings = QWidget()
         groups = QVBoxLayout(self.settings)
         groups.setContentsMargins(0, 0, 0, 0)
@@ -222,6 +232,7 @@ class MainWindow(QWidget):
         self.start_button.clicked.connect(lambda: self.toggle(with_delay=True))
 
         layout = QVBoxLayout(self)
+        layout.addLayout(header)
         layout.addWidget(self.settings)
         layout.addLayout(status_row)
         layout.addWidget(self.start_button)
