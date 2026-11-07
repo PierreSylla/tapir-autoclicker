@@ -1,7 +1,9 @@
 import signal
+import socket
 import sys
 
 from evdev import UInputError
+from PySide6.QtCore import QSocketNotifier, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
@@ -14,9 +16,20 @@ from tapir.ui.window import MainWindow
 
 
 def run() -> int:
-    # The kernel releases any held button when the process dies, so a hard Ctrl+C is safe.
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
     app = QApplication(sys.argv)
+    # Ctrl+C, kill and hangup quit like the tray's Quit, so the Hyprland bind and the socket are removed.
+    # Python runs signal handlers only when the interpreter gets control, which Qt's idle C++ loop never
+    # gives it: the wakeup fd wakes the loop and the notifier's slot runs Python code.
+    wake_read, wake_write = socket.socketpair()
+    wake_read.setblocking(False)
+    wake_write.setblocking(False)
+    signal.set_wakeup_fd(wake_write.fileno())
+    notifier = QSocketNotifier(wake_read.fileno(), QSocketNotifier.Type.Read)
+    notifier.activated.connect(lambda: wake_read.recv(64))
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        # Queued, because exiting before app.exec() starts is forgotten; exit() and not quit() so that
+        # an open dialog's loop ends too.
+        signal.signal(sig, lambda *_: QTimer.singleShot(0, app.exit))
     app.setDesktopFileName("tapir")
     app.setWindowIcon(QIcon.fromTheme("input-mouse"))
     config = cfg.load()

@@ -152,6 +152,7 @@ Settings are saved to `~/.config/tapir/config.toml` (or `$XDG_CONFIG_HOME/tapir/
 - When the 10 ms minimum clips the random variation, the average interval is slightly longer than the one set.
 - evdev fallback: the hotkey also reaches the focused application, and a modifier held while its device is unplugged counts as held until it is pressed again.
 - Two instances launched within the same few milliseconds can both start.
+- Ctrl+C, `kill` and closing the terminal quit cleanly, but `kill -9` cannot: the Hyprland bind then stays until Tapir starts again.
 
 ## Development
 

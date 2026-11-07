@@ -1,7 +1,7 @@
 import logging
 
 from evdev import ecodes
-from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QFont, QKeySequence
 from PySide6.QtNetwork import QLocalSocket
 from PySide6.QtWidgets import (
@@ -90,7 +90,8 @@ class MainWindow(QWidget):
         self.setWindowTitle("Tapir")
         QVBoxLayout(self).setContentsMargins(0, 0, 0, 0)
         self._build()
-        self._restore_hotkey()
+        # Once the event loop runs: a failed bind opens a dialog, which a signal could not end before that.
+        QTimer.singleShot(0, self._restore_hotkey)
 
     def start(self, with_delay: bool = True) -> None:
         if self.clicker.active:
