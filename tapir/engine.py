@@ -4,9 +4,13 @@ import time
 from dataclasses import dataclass
 from enum import StrEnum
 
+from evdev import UInput, ecodes
+
 MIN_INTERVAL_MS = 10
 DOUBLE_CLICK_GAP_S = 0.04
-BUTTONS = ("left", "right", "middle")
+UINPUT_NAME = "tapir-virtual-mouse"
+BUTTON_CODES = {"left": ecodes.BTN_LEFT, "right": ecodes.BTN_RIGHT, "middle": ecodes.BTN_MIDDLE}
+BUTTONS = tuple(BUTTON_CODES)
 
 
 class State(StrEnum):
@@ -25,6 +29,32 @@ class ClickSettings:
 
 def total_ms(hours: int = 0, minutes: int = 0, seconds: int = 0, milliseconds: int = 0) -> int:
     return ((hours * 60 + minutes) * 60 + seconds) * 1000 + milliseconds
+
+
+class UInputEmitter:
+    """Virtual mouse; clicks land wherever the compositor's cursor is."""
+
+    def __init__(self):
+        # REL axes are never used but make libinput classify the device as a pointer.
+        self._ui = UInput(
+            {ecodes.EV_KEY: list(BUTTON_CODES.values()), ecodes.EV_REL: [ecodes.REL_X, ecodes.REL_Y, ecodes.REL_WHEEL]},
+            name=UINPUT_NAME,
+        )
+
+    def press(self, button: str) -> None:
+        self._ui.write(ecodes.EV_KEY, BUTTON_CODES[button], 1)
+        self._ui.syn()
+
+    def release(self, button: str) -> None:
+        self._ui.write(ecodes.EV_KEY, BUTTON_CODES[button], 0)
+        self._ui.syn()
+
+    def close(self) -> None:
+        # The kernel drops releases for buttons that are not down, so releasing everything is safe.
+        for code in BUTTON_CODES.values():
+            self._ui.write(ecodes.EV_KEY, code, 0)
+        self._ui.syn()
+        self._ui.close()
 
 
 class Clicker:
