@@ -9,7 +9,8 @@ def test_round_trip(tmp_path):
     path = tmp_path / "sub" / "config.toml"
     config = Config(
         hours=1, minutes=2, seconds=3, milliseconds=4, button="middle", double_click=True,
-        repeat_forever=False, repeat_count=42, start_delay_s=7, hotkey="SUPER+F8",
+        repeat_forever=False, repeat_count=42, start_delay_s=7, hotkey="SUPER + code:74",
+        hotkey_label="Super+F8",
     )
     save(config, path)
     assert load(path) == config

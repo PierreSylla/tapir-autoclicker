@@ -25,6 +25,7 @@ class Config:
     repeat_count: int = 10
     start_delay_s: int = 3
     hotkey: str = ""
+    hotkey_label: str = ""
 
 
 def load(path: Path = CONFIG_PATH) -> Config:

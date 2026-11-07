@@ -6,6 +6,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from tapir import config as cfg
+from tapir import ipc
 from tapir.engine import UInputEmitter
 from tapir.ui.window import MainWindow
 
@@ -24,7 +25,7 @@ sudo udevadm trigger --name-match=uinput
 From the source tree, scripts/setup-permissions.sh does all of this."""
 
 
-def main() -> int:
+def run() -> int:
     # The kernel releases any held button when the process dies, so a hard Ctrl+C is safe.
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     app = QApplication(sys.argv)
@@ -36,9 +37,11 @@ def main() -> int:
         QMessageBox.critical(None, "Tapir", UINPUT_HELP.format(error=e))
         return 1
     window = MainWindow(cfg.load(), emitter)
+    ipc.serve(window.bridge.command_received.emit)
     window.show()
     try:
         return app.exec()
     finally:
-        window.clicker.stop()
+        ipc.SOCKET_PATH.unlink(missing_ok=True)
+        window.shutdown()
         emitter.close()

@@ -1,10 +1,16 @@
-from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtGui import QFont
+import logging
+
+from evdev import ecodes
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtGui import QFont, QKeySequence
+from PySide6.QtNetwork import QLocalSocket
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QRadioButton,
     QSpinBox,
@@ -13,34 +19,64 @@ from PySide6.QtWidgets import (
 )
 
 from tapir import config as cfg
+from tapir import hotkey
 from tapir.engine import MIN_INTERVAL_MS, Clicker, ClickSettings, State, total_ms
+
+log = logging.getLogger(__name__)
 
 WIDTH = 380
 WARNING_COLOR = "#d29922"
 STATE_COLORS = {State.STOPPED: "#8b949e", State.PENDING: WARNING_COLOR, State.RUNNING: "#3fb950"}
+QT_MODIFIERS = {
+    Qt.KeyboardModifier.MetaModifier: "SUPER",
+    Qt.KeyboardModifier.ControlModifier: "CTRL",
+    Qt.KeyboardModifier.AltModifier: "ALT",
+    Qt.KeyboardModifier.ShiftModifier: "SHIFT",
+}
+QT_MOUSE_BUTTONS = {Qt.MouseButton.BackButton: ecodes.BTN_SIDE, Qt.MouseButton.ForwardButton: ecodes.BTN_EXTRA}
+MODIFIER_KEYS = {
+    Qt.Key.Key_Shift, Qt.Key.Key_Control, Qt.Key.Key_Meta, Qt.Key.Key_Alt, Qt.Key.Key_AltGr,
+    Qt.Key.Key_Super_L, Qt.Key.Key_Super_R, Qt.Key.Key_Hyper_L, Qt.Key.Key_Hyper_R, Qt.Key.Key_CapsLock,
+}
 
 
-class EngineBridge(QObject):
+class Bridge(QObject):
+    """Carries events from background threads (engine, IPC, evdev) to the GUI thread."""
+
     state_changed = Signal(str, int)
     count_changed = Signal(int)
+    command_received = Signal(str)
+
+
+def _qt_mods(modifiers) -> frozenset[str]:
+    return frozenset(name for flag, name in QT_MODIFIERS.items() if modifiers & flag)
 
 
 class MainWindow(QWidget):
     def __init__(self, config: cfg.Config, emitter):
         super().__init__()
         self.config = config
-        self.bridge = EngineBridge()
+        self.bridge = Bridge()
         self.clicker = Clicker(
             emitter,
             on_state=lambda state, countdown=0: self.bridge.state_changed.emit(state, countdown),
             on_count=self.bridge.count_changed.emit,
         )
-        self.bridge.state_changed.connect(self._show_state, Qt.ConnectionType.QueuedConnection)
-        self.bridge.count_changed.connect(self._show_count, Qt.ConnectionType.QueuedConnection)
+        queued = Qt.ConnectionType.QueuedConnection
+        self.bridge.state_changed.connect(self._show_state, queued)
+        self.bridge.count_changed.connect(self._show_count, queued)
+        self.bridge.command_received.connect(self.handle_command, queued)
+        self.hotkey: hotkey.Hotkey | None = None
+        self.hyprland = hotkey.on_hyprland()
+        self.listener = None
+        if not self.hyprland and hotkey.EvdevListener.available():
+            self.listener = hotkey.EvdevListener(lambda: self.bridge.command_received.emit("toggle"))
+            self.listener.start()
         self.setWindowTitle("Tapir")
         self._build()
         self._show_state(State.STOPPED, 0)
         self._show_count(0)
+        self._restore_hotkey()
         # A fixed size also makes Hyprland float the window instead of tiling it.
         self.setFixedSize(WIDTH, self.sizeHint().height())
 
@@ -58,6 +94,26 @@ class MainWindow(QWidget):
             self.stop()
         else:
             self.start(with_delay)
+
+    def handle_command(self, command: str) -> None:
+        if command == "show":
+            self.showNormal()
+            self.raise_()
+            self.activateWindow()
+        elif command == "start":
+            self.start(with_delay=False)
+        elif command == "stop":
+            self.stop()
+        elif command == "toggle":
+            self.toggle()
+
+    def shutdown(self) -> None:
+        self.clicker.stop()
+        if self.hyprland and self.hotkey:
+            try:
+                hotkey.hyprland_unbind(self.hotkey)
+            except hotkey.HotkeyError as e:
+                log.warning("Could not remove the Hyprland bind: %s", e)
 
     def click_settings(self) -> ClickSettings:
         c = self.config
@@ -111,9 +167,23 @@ class MainWindow(QWidget):
         groups.addWidget(repeat)
 
         start = QGroupBox("Start")
-        row = QHBoxLayout(start)
-        row.addWidget(QLabel("Delay before start"))
-        row.addWidget(self._spin("start_delay_s", 10, " s"), 1)
+        delay_row = QHBoxLayout()
+        delay_row.addWidget(QLabel("Delay before start"))
+        delay_row.addWidget(self._spin("start_delay_s", 10, " s"), 1)
+        self.hotkey_label = QLabel()
+        self.hotkey_button = QPushButton("Set…")
+        self.hotkey_button.setToolTip("Press the new hotkey. Esc cancels, Backspace removes it.")
+        self.hotkey_button.clicked.connect(self._start_capture)
+        if not (self.hyprland or self.listener):
+            self.hotkey_button.setEnabled(False)
+            self.hotkey_label.setToolTip("Needs Hyprland, or read access to /dev/input/event*")
+        hotkey_row = QHBoxLayout()
+        hotkey_row.addWidget(QLabel("Hotkey"))
+        hotkey_row.addWidget(self.hotkey_label, 1)
+        hotkey_row.addWidget(self.hotkey_button)
+        box = QVBoxLayout(start)
+        box.addLayout(delay_row)
+        box.addLayout(hotkey_row)
         groups.addWidget(start)
 
         self.status = QLabel()
@@ -180,3 +250,96 @@ class MainWindow(QWidget):
 
     def _show_count(self, count: int) -> None:
         self.counter.setText(f"Clicks: {count:,}")
+
+    def _show_hotkey(self) -> None:
+        if not self.config.hotkey:
+            self.hotkey_label.setText("None")
+        elif self.hotkey:
+            self.hotkey_label.setText(self.config.hotkey_label)
+        else:
+            self.hotkey_label.setText(f"{self.config.hotkey_label} (inactive)")
+
+    def _restore_hotkey(self) -> None:
+        if self.config.hotkey and (self.hyprland or self.listener):
+            try:
+                self._activate_hotkey(hotkey.Hotkey.parse(self.config.hotkey), self.config.hotkey_label)
+            except ValueError as e:
+                log.warning("Ignoring saved hotkey: %s", e)
+        if self.hyprland:
+            self._hyprland_events = QLocalSocket(self)
+            self._hyprland_events.readyRead.connect(self._on_hyprland_event)
+            self._hyprland_events.connectToServer(str(hotkey.hyprland_event_socket()))
+        self._show_hotkey()
+
+    def _on_hyprland_event(self) -> None:
+        # A config reload (Hyprland does one on every config save) wipes binds added at runtime.
+        reloaded = b"configreloaded>>" in bytes(self._hyprland_events.readAll())
+        if reloaded and self.hotkey and not self._activate_hotkey(self.hotkey, self.config.hotkey_label):
+            self.hotkey = None
+            self._show_hotkey()
+
+    def _activate_hotkey(self, new: hotkey.Hotkey | None, label: str) -> bool:
+        try:
+            if self.hyprland:
+                if new:
+                    hotkey.hyprland_bind(new, label.rsplit("+", 1)[-1])
+                if self.hotkey and self.hotkey != new:
+                    hotkey.hyprland_unbind(self.hotkey)
+        except hotkey.HotkeyError as e:
+            QMessageBox.warning(self, "Tapir", f"Could not set the hotkey.\n\n{e}")
+            return False
+        if self.listener:
+            self.listener.hotkey = new
+        self.hotkey = new
+        return True
+
+    def _set_hotkey(self, new: hotkey.Hotkey | None, label: str) -> None:
+        self._end_capture()
+        if self._activate_hotkey(new, label):
+            self.config.hotkey = new.spec if new else ""
+            self.config.hotkey_label = label
+            cfg.save(self.config)
+        self._show_hotkey()
+
+    def _start_capture(self) -> None:
+        self.hotkey_label.setText("Press a key or side button…")
+        QApplication.instance().installEventFilter(self)
+
+    def _end_capture(self) -> None:
+        QApplication.instance().removeEventFilter(self)
+        self._show_hotkey()
+
+    def eventFilter(self, watched, event) -> bool:
+        kind = event.type()
+        if kind == QEvent.Type.KeyPress:
+            if not event.isAutoRepeat():
+                self._capture_key(event)
+            return True
+        if kind == QEvent.Type.MouseButtonPress:
+            self._capture_mouse(event)
+            return True
+        return kind in (QEvent.Type.KeyRelease, QEvent.Type.MouseButtonRelease, QEvent.Type.MouseButtonDblClick)
+
+    def _capture_key(self, event) -> None:
+        key = event.key()
+        if key in MODIFIER_KEYS:
+            return
+        mods = _qt_mods(event.modifiers())
+        if key == Qt.Key.Key_Escape and not mods:
+            self._end_capture()
+        elif key == Qt.Key.Key_Backspace and not mods:
+            self._set_hotkey(None, "")
+        elif (code := event.nativeScanCode() - hotkey.XKB_KEYCODE_OFFSET) > 0:
+            new = hotkey.Hotkey(mods, code)
+            self._set_hotkey(new, new.label(QKeySequence(key).toString()))
+        else:
+            log.warning("Key without a scan code, cannot bind it")
+            self._end_capture()
+
+    def _capture_mouse(self, event) -> None:
+        code = QT_MOUSE_BUTTONS.get(event.button())
+        if code is None:
+            self._end_capture()
+            return
+        new = hotkey.Hotkey(_qt_mods(event.modifiers()), code)
+        self._set_hotkey(new, new.label())

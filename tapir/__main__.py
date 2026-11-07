@@ -1,5 +1,5 @@
 import sys
 
-from tapir.ui.app import main
+from tapir.ipc import main
 
 sys.exit(main())
