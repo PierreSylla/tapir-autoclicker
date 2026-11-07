@@ -154,24 +154,6 @@ Settings are saved to `~/.config/tapir/config.toml` (or `$XDG_CONFIG_HOME/tapir/
 - Two instances launched within the same few milliseconds can both start.
 - Ctrl+C, `kill` and closing the terminal quit cleanly, but `kill -9` cannot: the Hyprland bind then stays until Tapir starts again.
 
-## Development
-
-```
-python -m pytest
-```
-
-`tapir/engine.py` holds the click worker and the virtual mouse (no Qt), `hotkey.py` the hotkey model, Hyprland binds and evdev listener, `ipc.py` the socket and command line, `config.py` the settings file, `i18n.py` the French translations, and `ui/` the window and tray. A test checks that every text passed to `tr()` has a French translation with the same placeholders.
-
-### Releasing
-
-Set the new version in `pyproject.toml` and `pkgver` in `packaging/PKGBUILD`, commit, then push a matching tag:
-
-```
-git tag v0.2.0
-git push origin v0.2.0
-```
-
-The *Publish* workflow runs the tests, checks that the tag matches the version in `pyproject.toml`, builds the sdist and wheel and uploads them to PyPI through trusted publishing (no API token is stored anywhere).
 
 ## License
 

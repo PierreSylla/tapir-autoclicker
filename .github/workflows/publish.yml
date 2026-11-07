@@ -17,11 +17,12 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Check that the tag matches the version
+      - name: Check that the tag matches the versions
         run: |
           version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
-          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match version $version in pyproject.toml"
+          pkgver=$(sed -n 's/^pkgver=//p' packaging/PKGBUILD)
+          if [ "$GITHUB_REF_NAME" != "v$version" ] || [ "$pkgver" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME, pyproject.toml ($version) and PKGBUILD ($pkgver) must give the same version"
             exit 1
           fi
       - name: Test

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tapir-autoclicker"
-version = "0.2.0"
+version = "0.2.1"
 description = "Small Wayland-friendly autoclicker with a Qt UI"
 readme = "README.md"
 license = "MIT"

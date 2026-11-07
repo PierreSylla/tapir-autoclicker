@@ -1,5 +1,5 @@
 pkgname=tapir-autoclicker
-pkgver=0.2.0
+pkgver=0.2.1
 pkgrel=1
 pkgdesc='Small autoclicker for Wayland with a Qt UI'
 arch=('any')
