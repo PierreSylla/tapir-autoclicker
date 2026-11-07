@@ -1,0 +1,31 @@
+pkgname=tapir-autoclicker
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Small autoclicker for Wayland with a Qt UI'
+arch=('any')
+license=('MIT')
+depends=('python' 'pyside6' 'python-evdev' 'python-tomli-w')
+makedepends=('git' 'python-build' 'python-installer' 'python-setuptools')
+checkdepends=('python-pytest')
+optdepends=('hyprland: global hotkey managed by Tapir')
+# Builds the last commit of the repository this PKGBUILD lives in.
+source=("$pkgname::git+file://${startdir%/packaging}")
+sha256sums=('SKIP')
+
+build() {
+  cd "$pkgname"
+  python -m build --wheel --no-isolation
+}
+
+check() {
+  cd "$pkgname"
+  python -m pytest -q
+}
+
+package() {
+  cd "$pkgname"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+  install -Dm644 packaging/70-tapir-uinput.rules -t "$pkgdir/usr/lib/udev/rules.d/"
+  install -Dm644 packaging/tapir.desktop -t "$pkgdir/usr/share/applications/"
+  install -Dm644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname/"
+}

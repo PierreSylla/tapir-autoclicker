@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "tapir-autoclicker"
 version = "0.1.0"
 description = "Small Wayland-friendly autoclicker with a Qt UI"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = ["PySide6>=6.5", "evdev>=1.6", "tomli-w>=1.0"]
 

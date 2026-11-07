@@ -1,0 +1,2 @@
+# Must sort before 73-seat-late.rules, which is where the uaccess tag is turned into an ACL.
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"

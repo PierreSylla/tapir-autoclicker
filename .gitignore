@@ -4,3 +4,7 @@ __pycache__/
 build/
 dist/
 .venv/
+packaging/src/
+packaging/pkg/
+packaging/tapir-autoclicker/
+*.pkg.tar.*

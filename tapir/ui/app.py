@@ -14,7 +14,7 @@ from tapir.ui.window import MainWindow
 UINPUT_HELP = """Tapir cannot create its virtual mouse:
 {error}
 
-Tapir needs write access to /dev/uinput. Install this udev rule as /etc/udev/rules.d/99-tapir-uinput.rules:
+Tapir needs write access to /dev/uinput. Install this udev rule as /etc/udev/rules.d/70-tapir-uinput.rules:
 
 KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"
 

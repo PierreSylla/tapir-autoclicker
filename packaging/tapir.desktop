@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Tapir
+GenericName=Autoclicker
+Comment=Automatic mouse clicker for Wayland
+Exec=tapir
+Icon=input-mouse
+Terminal=false
+Categories=Utility;
+Keywords=autoclicker;clicker;mouse;click;
+StartupWMClass=tapir
