@@ -8,7 +8,7 @@ def test_missing_file_gives_defaults(tmp_path):
 def test_round_trip(tmp_path):
     path = tmp_path / "sub" / "config.toml"
     config = Config(
-        hours=1, minutes=2, seconds=3, milliseconds=4, button="middle", double_click=True,
+        hours=1, minutes=2, seconds=3, milliseconds=4, jitter_ms=25, button="middle", double_click=True,
         repeat_forever=False, repeat_count=42, start_delay_s=7, hotkey="SUPER + code:74",
         hotkey_label="Super+F8",
     )

@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from tapir import config as cfg
 from tapir import hotkey
-from tapir.engine import MIN_INTERVAL_MS, Clicker, ClickSettings, State, total_ms
+from tapir.engine import MIN_INTERVAL_MS, Clicker, ClickSettings, State, gap_range_ms, total_ms
 
 log = logging.getLogger(__name__)
 
@@ -137,6 +137,7 @@ class MainWindow(QWidget):
             button=c.button,
             double=c.double_click,
             repeat=None if c.repeat_forever else c.repeat_count,
+            jitter_ms=c.jitter_ms,
         )
 
     def _build(self) -> None:
@@ -150,9 +151,13 @@ class MainWindow(QWidget):
             ("hours", 99, " h"), ("minutes", 59, " min"), ("seconds", 59, " s"), ("milliseconds", 999, " ms"),
         ):
             spins.addWidget(self._spin(field, maximum, suffix))
+        jitter_row = QHBoxLayout()
+        jitter_row.addWidget(QLabel("Random variation ±"))
+        jitter_row.addWidget(self._spin("jitter_ms", 3_600_000, " ms"), 1)
         self.interval_hint = QLabel()
         box = QVBoxLayout(interval)
         box.addLayout(spins)
+        box.addLayout(jitter_row)
         box.addWidget(self.interval_hint)
         groups.addWidget(interval)
 
@@ -243,14 +248,15 @@ class MainWindow(QWidget):
         self._update_interval_hint()
 
     def _update_interval_hint(self) -> None:
-        ms = self.click_settings().interval_ms
-        if ms < MIN_INTERVAL_MS:
+        settings = self.click_settings()
+        low, high = gap_range_ms(settings.interval_ms, settings.jitter_ms)
+        gap = f"{low:,} ms" if low == high else f"{low:,}–{high:,} ms"
+        if settings.interval_ms < MIN_INTERVAL_MS:
             self.interval_hint.setText(
-                f'<span style="color:{WARNING_COLOR}">Minimum is {MIN_INTERVAL_MS} ms, '
-                f"using {MIN_INTERVAL_MS} ms</span>"
+                f'<span style="color:{WARNING_COLOR}">Minimum is {MIN_INTERVAL_MS} ms, using {gap}</span>'
             )
         else:
-            self.interval_hint.setText(f"{ms:,} ms between clicks")
+            self.interval_hint.setText(f"{gap} between clicks")
 
     def _show_state(self, state: str, countdown: int) -> None:
         state = State(state)

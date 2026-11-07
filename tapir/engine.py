@@ -1,4 +1,5 @@
 import math
+import random
 import threading
 import time
 from dataclasses import dataclass
@@ -25,10 +26,20 @@ class ClickSettings:
     button: str = "left"
     double: bool = False
     repeat: int | None = None  # None = until stopped
+    jitter_ms: int = 0
 
 
 def total_ms(hours: int = 0, minutes: int = 0, seconds: int = 0, milliseconds: int = 0) -> int:
     return ((hours * 60 + minutes) * 60 + seconds) * 1000 + milliseconds
+
+
+def gap_range_ms(interval_ms: int, jitter_ms: int = 0) -> tuple[int, int]:
+    base = max(interval_ms, MIN_INTERVAL_MS)
+    return max(base - jitter_ms, MIN_INTERVAL_MS), base + jitter_ms
+
+
+def gap_ms(interval_ms: int, jitter_ms: int = 0) -> int:
+    return random.randint(*gap_range_ms(interval_ms, jitter_ms))
 
 
 class UInputEmitter:
@@ -104,7 +115,6 @@ class Clicker:
         return stop.is_set()
 
     def _click_loop(self, settings: ClickSettings, stop: threading.Event) -> None:
-        interval = max(settings.interval_ms, MIN_INTERVAL_MS) / 1000
         count = 0
         next_at = time.monotonic()
         while settings.repeat is None or count < settings.repeat:
@@ -114,7 +124,8 @@ class Clicker:
             count += 1
             self._on_count(count)
             # After a stall (suspend, overload) resume from now instead of firing a burst of late clicks.
-            next_at = max(next_at + interval, time.monotonic())
+            gap = gap_ms(settings.interval_ms, settings.jitter_ms) / 1000
+            next_at = max(next_at + gap, time.monotonic())
 
     def _click(self, settings: ClickSettings, stop: threading.Event) -> None:
         self._emitter.press(settings.button)

@@ -19,6 +19,7 @@ class Config:
     minutes: int = 0
     seconds: int = 0
     milliseconds: int = 100
+    jitter_ms: int = 0
     button: str = "left"
     double_click: bool = False
     repeat_forever: bool = True

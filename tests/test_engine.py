@@ -1,7 +1,16 @@
 import threading
 import time
 
-from tapir.engine import DOUBLE_CLICK_GAP_S, MIN_INTERVAL_MS, Clicker, ClickSettings, State, total_ms
+from tapir.engine import (
+    DOUBLE_CLICK_GAP_S,
+    MIN_INTERVAL_MS,
+    Clicker,
+    ClickSettings,
+    State,
+    gap_ms,
+    gap_range_ms,
+    total_ms,
+)
 
 
 class FakeEmitter:
@@ -42,6 +51,23 @@ def test_total_ms():
     assert total_ms() == 0
     assert total_ms(1, 2, 3, 4) == 3_723_004
     assert total_ms(milliseconds=250) == 250
+
+
+def test_gap_without_jitter_is_the_interval():
+    assert {gap_ms(250) for _ in range(100)} == {250}
+    assert gap_ms(0) == MIN_INTERVAL_MS
+
+
+def test_jitter_stays_within_bounds_and_varies():
+    gaps = [gap_ms(100, 20) for _ in range(2000)]
+    assert min(gaps) >= 80 and max(gaps) <= 120
+    assert min(gaps) < 85 and max(gaps) > 115
+
+
+def test_jitter_never_goes_below_floor():
+    assert gap_range_ms(15, 50) == (MIN_INTERVAL_MS, 65)
+    assert gap_range_ms(0, 5) == (MIN_INTERVAL_MS, 15)
+    assert min(gap_ms(15, 50) for _ in range(2000)) >= MIN_INTERVAL_MS
 
 
 def test_interval_floor_applies_below_minimum():
