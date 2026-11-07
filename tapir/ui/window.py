@@ -52,7 +52,17 @@ def _qt_mods(modifiers) -> frozenset[str]:
     return frozenset(name for flag, name in QT_MODIFIERS.items() if modifiers & flag)
 
 
+def state_text(state: State, countdown: int) -> str:
+    return {
+        State.STOPPED: "Stopped",
+        State.PENDING: f"Starting in {countdown} s",
+        State.RUNNING: "Running",
+    }[state]
+
+
 class MainWindow(QWidget):
+    hide_on_close = False
+
     def __init__(self, config: cfg.Config, emitter):
         super().__init__()
         self.config = config
@@ -106,6 +116,11 @@ class MainWindow(QWidget):
             self.stop()
         elif command == "toggle":
             self.toggle()
+
+    def closeEvent(self, event) -> None:
+        if self.hide_on_close:
+            event.ignore()
+            self.hide()
 
     def shutdown(self) -> None:
         self.clicker.stop()
@@ -239,12 +254,9 @@ class MainWindow(QWidget):
 
     def _show_state(self, state: str, countdown: int) -> None:
         state = State(state)
-        text = {
-            State.STOPPED: "Stopped",
-            State.PENDING: f"Starting in {countdown} s",
-            State.RUNNING: "Running",
-        }[state]
-        self.status.setText(f'<span style="color:{STATE_COLORS[state]}">●</span> <b>{text}</b>')
+        self.status.setText(
+            f'<span style="color:{STATE_COLORS[state]}">●</span> <b>{state_text(state, countdown)}</b>'
+        )
         self.start_button.setText("Start" if state == State.STOPPED else "Stop")
         self.settings.setEnabled(state == State.STOPPED)
 

@@ -3,11 +3,12 @@ import sys
 
 from evdev import UInputError
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 from tapir import config as cfg
 from tapir import ipc
 from tapir.engine import UInputEmitter
+from tapir.ui.tray import Tray
 from tapir.ui.window import MainWindow
 
 UINPUT_HELP = """Tapir cannot create its virtual mouse:
@@ -37,6 +38,11 @@ def run() -> int:
         QMessageBox.critical(None, "Tapir", UINPUT_HELP.format(error=e))
         return 1
     window = MainWindow(cfg.load(), emitter)
+    if QSystemTrayIcon.isSystemTrayAvailable():
+        tray = Tray(window)
+        tray.show()
+        window.hide_on_close = True
+        app.setQuitOnLastWindowClosed(False)
     ipc.serve(window.bridge.command_received.emit)
     window.show()
     try:
