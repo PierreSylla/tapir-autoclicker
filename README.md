@@ -4,6 +4,11 @@ A small autoclicker for Linux Wayland desktops, with a compact Qt window.
 
 Clicks go through a virtual `uinput` mouse, so they work under any compositor. No X11 tools (xdotool, pynput, PyAutoGUI) are involved.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/PierreSylla/tapir-autoclicker/main/docs/window-en.png" width="380" alt="Tapir window in English, stopped">
+  <img src="https://raw.githubusercontent.com/PierreSylla/tapir-autoclicker/main/docs/window-fr-running.png" width="380" alt="Tapir window in French, clicking">
+</p>
+
 ## Features
 
 - Interval in hours, minutes, seconds and milliseconds (10 ms minimum), with an optional random variation of ± N ms
