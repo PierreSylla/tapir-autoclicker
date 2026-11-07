@@ -14,6 +14,7 @@ Clicks go through a virtual `uinput` mouse, so they work under any compositor. N
 - Global start/stop hotkey: a bind managed in Hyprland, or an evdev fallback elsewhere
 - Command line and Unix socket: `tapir toggle | start | stop`
 - Tray icon coloured by state (grey stopped, amber countdown, green running)
+- English or French interface, following the system language until you pick one
 - Settings saved on every change
 
 ## Installation
@@ -67,6 +68,8 @@ On Hyprland, Tapir never reads your keyboard. The evdev fallback for other compo
 ## Usage
 
 Set the interval, button, click type and repeat mode, then press **Start**. The status line shows *Stopped*, *Starting in N s* or *Running*, and the counter shows the clicks of the current session. In "Repeat N times" mode the session stops on its own.
+
+The list at the top left switches the interface between English and French; the change applies immediately and is saved.
 
 The settings are locked while a session runs. When a tray is available, closing the window (the **✕** button or your compositor's close shortcut) hides it to the tray; **Quit** is in the tray menu. Without a tray, closing the window quits.
 
@@ -140,7 +143,7 @@ Settings are saved to `~/.config/tapir/config.toml` (or `$XDG_CONFIG_HOME/tapir/
 python -m pytest
 ```
 
-`tapir/engine.py` holds the click worker and the virtual mouse (no Qt), `hotkey.py` the hotkey model, Hyprland binds and evdev listener, `ipc.py` the socket and command line, `config.py` the settings file, and `ui/` the window and tray.
+`tapir/engine.py` holds the click worker and the virtual mouse (no Qt), `hotkey.py` the hotkey model, Hyprland binds and evdev listener, `ipc.py` the socket and command line, `config.py` the settings file, `i18n.py` the French translations, and `ui/` the window and tray. A test checks that every text passed to `tr()` has a French translation with the same placeholders.
 
 ## License
 

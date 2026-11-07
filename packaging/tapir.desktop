@@ -2,10 +2,13 @@
 Type=Application
 Name=Tapir
 GenericName=Autoclicker
+GenericName[fr]=Autocliqueur
 Comment=Automatic mouse clicker for Wayland
+Comment[fr]=Clics de souris automatiques pour Wayland
 Exec=tapir
 Icon=input-mouse
 Terminal=false
 Categories=Utility;
 Keywords=autoclicker;clicker;mouse;click;
+Keywords[fr]=autoclicker;autocliqueur;souris;clic;
 StartupWMClass=tapir

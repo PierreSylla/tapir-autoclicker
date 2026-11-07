@@ -10,7 +10,7 @@ def test_round_trip(tmp_path):
     config = Config(
         hours=1, minutes=2, seconds=3, milliseconds=4, jitter_ms=25, button="middle", double_click=True,
         repeat_forever=False, repeat_count=42, start_delay_s=7, hotkey="SUPER + code:74",
-        hotkey_label="Super+F8",
+        hotkey_label="Super+F8", language="fr",
     )
     save(config, path)
     assert load(path) == config

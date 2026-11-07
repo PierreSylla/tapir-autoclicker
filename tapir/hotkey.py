@@ -14,6 +14,7 @@ import evdev
 from evdev import ecodes
 
 from tapir.engine import UINPUT_NAME
+from tapir.i18n import tr, translate_label
 from tapir.ipc import RUNTIME_DIR
 
 MODMASKS = {"SUPER": 64, "CTRL": 4, "ALT": 8, "SHIFT": 1}
@@ -114,7 +115,8 @@ def hyprland_bind(hotkey: Hotkey, key_text: str) -> None:
     except ValueError as e:
         raise HotkeyError(f"unexpected hyprctl output: {e}") from e
     if find_conflict(hotkey, key_text, binds):
-        raise HotkeyError(f"{hotkey.label(key_text)} is already bound in Hyprland.")
+        label = translate_label(hotkey.label(key_text))
+        raise HotkeyError(tr("{label} is already bound in Hyprland.", label=label))
     # hl.unbind drops every bind on the combo; safe here because the conflict check proved they are all ours,
     # and it removes a duplicate left behind by a crashed instance.
     hyprland_unbind(hotkey)

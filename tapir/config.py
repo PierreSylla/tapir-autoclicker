@@ -27,6 +27,7 @@ class Config:
     start_delay_s: int = 3
     hotkey: str = ""
     hotkey_label: str = ""
+    language: str = ""  # empty: follow the system
 
 
 def load(path: Path = CONFIG_PATH) -> Config:

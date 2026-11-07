@@ -20,8 +20,9 @@ from PySide6.QtWidgets import (
 )
 
 from tapir import config as cfg
-from tapir import hotkey
+from tapir import hotkey, i18n
 from tapir.engine import MIN_INTERVAL_MS, Clicker, ClickSettings, State, gap_range_ms, total_ms
+from tapir.i18n import number, tr, translate_label
 
 log = logging.getLogger(__name__)
 
@@ -55,14 +56,15 @@ def _qt_mods(modifiers) -> frozenset[str]:
 
 def state_text(state: State, countdown: int) -> str:
     return {
-        State.STOPPED: "Stopped",
-        State.PENDING: f"Starting in {countdown} s",
-        State.RUNNING: "Running",
+        State.STOPPED: tr("Stopped"),
+        State.PENDING: tr("Starting in {n} s", n=countdown),
+        State.RUNNING: tr("Running"),
     }[state]
 
 
 class MainWindow(QWidget):
     hide_on_close = False
+    language_changed = Signal()
 
     def __init__(self, config: cfg.Config, emitter):
         super().__init__()
@@ -83,13 +85,12 @@ class MainWindow(QWidget):
         if not self.hyprland and hotkey.EvdevListener.available():
             self.listener = hotkey.EvdevListener(lambda: self.bridge.command_received.emit("toggle"))
             self.listener.start()
+        self.state, self.countdown, self.count = State.STOPPED, 0, 0
+        self.content = None
         self.setWindowTitle("Tapir")
+        QVBoxLayout(self).setContentsMargins(0, 0, 0, 0)
         self._build()
-        self._show_state(State.STOPPED, 0)
-        self._show_count(0)
         self._restore_hotkey()
-        # A fixed size also makes Hyprland float the window instead of tiling it.
-        self.setFixedSize(WIDTH, self.sizeHint().height())
 
     def start(self, with_delay: bool = True) -> None:
         if self.clicker.active:
@@ -142,12 +143,20 @@ class MainWindow(QWidget):
         )
 
     def _build(self) -> None:
+        """Builds the window content, again after each language change."""
+        codes = list(i18n.LANGUAGES)
+        language = QComboBox()
+        language.addItems(i18n.LANGUAGES.values())
+        language.setCurrentIndex(codes.index(i18n.language()))
+        language.setToolTip(tr("Language"))
+        language.currentIndexChanged.connect(lambda i: self._set_language(codes[i]))
         # Hyprland draws no title bar, so the window brings its own close button.
         # A glyph rather than a theme icon: it follows the text colour, theme icons can be dark on dark.
         close = QToolButton(text="✕", autoRaise=True)
-        close.setToolTip("Close")
+        close.setToolTip(tr("Close"))
         close.clicked.connect(self.close)
         header = QHBoxLayout()
+        header.addWidget(language)
         header.addStretch(1)
         header.addWidget(close)
 
@@ -155,14 +164,14 @@ class MainWindow(QWidget):
         groups = QVBoxLayout(self.settings)
         groups.setContentsMargins(0, 0, 0, 0)
 
-        interval = QGroupBox("Interval")
+        interval = QGroupBox(tr("Interval"))
         spins = QHBoxLayout()
         for field, maximum, suffix in (
             ("hours", 99, " h"), ("minutes", 59, " min"), ("seconds", 59, " s"), ("milliseconds", 999, " ms"),
         ):
             spins.addWidget(self._spin(field, maximum, suffix))
         jitter_row = QHBoxLayout()
-        jitter_row.addWidget(QLabel("Random variation ±"))
+        jitter_row.addWidget(QLabel(tr("Random variation ±")))
         jitter_row.addWidget(self._spin("jitter_ms", 3_600_000, " ms"), 1)
         self.interval_hint = QLabel()
         box = QVBoxLayout(interval)
@@ -171,19 +180,19 @@ class MainWindow(QWidget):
         box.addWidget(self.interval_hint)
         groups.addWidget(interval)
 
-        click = QGroupBox("Click")
+        click = QGroupBox(tr("Click"))
         row = QHBoxLayout(click)
-        row.addWidget(QLabel("Button"))
-        row.addWidget(self._combo("button", {"left": "Left", "right": "Right", "middle": "Middle"}), 1)
+        row.addWidget(QLabel(tr("Button")))
+        row.addWidget(self._combo("button", {"left": tr("Left"), "right": tr("Right"), "middle": tr("Middle")}), 1)
         row.addSpacing(8)
-        row.addWidget(QLabel("Type"))
-        row.addWidget(self._combo("double_click", {False: "Single", True: "Double"}), 1)
+        row.addWidget(QLabel(tr("Type")))
+        row.addWidget(self._combo("double_click", {False: tr("Single"), True: tr("Double")}), 1)
         groups.addWidget(click)
 
-        repeat = QGroupBox("Repeat")
-        times = QRadioButton("Repeat")
-        forever = QRadioButton("Until stopped")
-        count = self._spin("repeat_count", 1_000_000, " times", minimum=1)
+        repeat = QGroupBox(tr("Repetition"))
+        times = QRadioButton(tr("Repeat"))
+        forever = QRadioButton(tr("Until stopped"))
+        count = self._spin("repeat_count", 1_000_000, tr(" times"), minimum=1)
         (forever if self.config.repeat_forever else times).setChecked(True)
         count.setEnabled(times.isChecked())
         times.toggled.connect(count.setEnabled)
@@ -196,19 +205,19 @@ class MainWindow(QWidget):
         box.addWidget(forever)
         groups.addWidget(repeat)
 
-        start = QGroupBox("Start")
+        start = QGroupBox(tr("Startup"))
         delay_row = QHBoxLayout()
-        delay_row.addWidget(QLabel("Delay before start"))
+        delay_row.addWidget(QLabel(tr("Delay before start")))
         delay_row.addWidget(self._spin("start_delay_s", 10, " s"), 1)
         self.hotkey_label = QLabel()
-        self.hotkey_button = QPushButton("Set…")
-        self.hotkey_button.setToolTip("Press the new hotkey. Esc cancels, Backspace removes it.")
+        self.hotkey_button = QPushButton(tr("Set…"))
+        self.hotkey_button.setToolTip(tr("Press the new hotkey. Esc cancels, Backspace removes it."))
         self.hotkey_button.clicked.connect(self._start_capture)
         if not (self.hyprland or self.listener):
             self.hotkey_button.setEnabled(False)
-            self.hotkey_label.setToolTip("Needs Hyprland, or read access to /dev/input/event*")
+            self.hotkey_label.setToolTip(tr("Needs Hyprland, or read access to /dev/input/event*"))
         hotkey_row = QHBoxLayout()
-        hotkey_row.addWidget(QLabel("Hotkey"))
+        hotkey_row.addWidget(QLabel(tr("Hotkey")))
         hotkey_row.addWidget(self.hotkey_label, 1)
         hotkey_row.addWidget(self.hotkey_button)
         box = QVBoxLayout(start)
@@ -231,12 +240,33 @@ class MainWindow(QWidget):
         self.start_button.setFont(font)
         self.start_button.clicked.connect(lambda: self.toggle(with_delay=True))
 
-        layout = QVBoxLayout(self)
+        content = QWidget()
+        layout = QVBoxLayout(content)
         layout.addLayout(header)
         layout.addWidget(self.settings)
         layout.addLayout(status_row)
         layout.addWidget(self.start_button)
+        if self.content:
+            self.layout().removeWidget(self.content)
+            self.content.hide()
+            self.content.deleteLater()  # not now: the language combo inside it is still emitting
+        self.content = content
+        self.layout().addWidget(content)
+        # A child added to a visible window stays hidden until shown, and sizeHint() skips hidden
+        # widgets: the fixed height below would be 0, which Wayland reads as "no maximum".
+        content.show()
         self._update_interval_hint()
+        self._show_state(self.state, self.countdown)
+        self._show_count(self.count)
+        self._show_hotkey()
+        # A fixed size also makes Hyprland float the window instead of tiling it.
+        self.setFixedSize(WIDTH, self.sizeHint().height())
+
+    def _set_language(self, code: str) -> None:
+        i18n.set_language(code)
+        self._set("language", code)
+        self._build()
+        self.language_changed.emit()
 
     def _spin(self, field: str, maximum: int, suffix: str, minimum: int = 0) -> QSpinBox:
         box = QSpinBox(minimum=minimum, maximum=maximum, suffix=suffix)
@@ -261,32 +291,34 @@ class MainWindow(QWidget):
     def _update_interval_hint(self) -> None:
         settings = self.click_settings()
         low, high = gap_range_ms(settings.interval_ms, settings.jitter_ms)
-        gap = f"{low:,} ms" if low == high else f"{low:,}–{high:,} ms"
+        gap = f"{number(low)} ms" if low == high else f"{number(low)}–{number(high)} ms"
         if settings.interval_ms < MIN_INTERVAL_MS:
-            self.interval_hint.setText(
-                f'<span style="color:{WARNING_COLOR}">Minimum is {MIN_INTERVAL_MS} ms, using {gap}</span>'
-            )
+            warning = tr("Minimum is {min} ms, using {gap}", min=MIN_INTERVAL_MS, gap=gap)
+            self.interval_hint.setText(f'<span style="color:{WARNING_COLOR}">{warning}</span>')
         else:
-            self.interval_hint.setText(f"{gap} between clicks")
+            self.interval_hint.setText(tr("{gap} between clicks", gap=gap))
 
     def _show_state(self, state: str, countdown: int) -> None:
         state = State(state)
+        self.state, self.countdown = state, countdown
         self.status.setText(
             f'<span style="color:{STATE_COLORS[state]}">●</span> <b>{state_text(state, countdown)}</b>'
         )
-        self.start_button.setText("Start" if state == State.STOPPED else "Stop")
+        self.start_button.setText(tr("Start") if state == State.STOPPED else tr("Stop"))
         self.settings.setEnabled(state == State.STOPPED)
 
     def _show_count(self, count: int) -> None:
-        self.counter.setText(f"Clicks: {count:,}")
+        self.count = count
+        self.counter.setText(tr("Clicks: {n}", n=number(count)))
 
     def _show_hotkey(self) -> None:
+        label = translate_label(self.config.hotkey_label)
         if not self.config.hotkey:
-            self.hotkey_label.setText("None")
+            self.hotkey_label.setText(tr("None"))
         elif self.hotkey:
-            self.hotkey_label.setText(self.config.hotkey_label)
+            self.hotkey_label.setText(label)
         else:
-            self.hotkey_label.setText(f"{self.config.hotkey_label} (inactive)")
+            self.hotkey_label.setText(tr("{label} (inactive)", label=label))
 
     def _restore_hotkey(self) -> None:
         if self.config.hotkey and (self.hyprland or self.listener):
@@ -315,7 +347,7 @@ class MainWindow(QWidget):
                 if self.hotkey and self.hotkey != new:
                     hotkey.hyprland_unbind(self.hotkey)
         except hotkey.HotkeyError as e:
-            QMessageBox.warning(self, "Tapir", f"Could not set the hotkey.\n\n{e}")
+            QMessageBox.warning(self, "Tapir", tr("Could not set the hotkey.") + f"\n\n{e}")
             return False
         if self.listener:
             self.listener.hotkey = new
@@ -331,7 +363,7 @@ class MainWindow(QWidget):
         self._show_hotkey()
 
     def _start_capture(self) -> None:
-        self.hotkey_label.setText("Press a key or side button…")
+        self.hotkey_label.setText(tr("Press a key or side button…"))
         QApplication.instance().installEventFilter(self)
 
     def _end_capture(self) -> None:

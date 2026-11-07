@@ -8,22 +8,9 @@ from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 from tapir import config as cfg
 from tapir import ipc
 from tapir.engine import UInputEmitter
+from tapir.i18n import UINPUT_HELP, set_language, tr
 from tapir.ui.tray import Tray
 from tapir.ui.window import MainWindow
-
-UINPUT_HELP = """Tapir cannot create its virtual mouse:
-{error}
-
-Tapir needs write access to /dev/uinput. Install this udev rule as /etc/udev/rules.d/70-tapir-uinput.rules:
-
-KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"
-
-then reload it (or reboot):
-
-sudo udevadm control --reload-rules
-sudo udevadm trigger --name-match=uinput
-
-From the source tree, scripts/setup-permissions.sh does all of this."""
 
 
 def run() -> int:
@@ -32,12 +19,14 @@ def run() -> int:
     app = QApplication(sys.argv)
     app.setDesktopFileName("tapir")
     app.setWindowIcon(QIcon.fromTheme("input-mouse"))
+    config = cfg.load()
+    set_language(config.language)
     try:
         emitter = UInputEmitter()
     except (OSError, UInputError) as e:
-        QMessageBox.critical(None, "Tapir", UINPUT_HELP.format(error=e))
+        QMessageBox.critical(None, "Tapir", tr(UINPUT_HELP, error=e))
         return 1
-    window = MainWindow(cfg.load(), emitter)
+    window = MainWindow(config, emitter)
     if QSystemTrayIcon.isSystemTrayAvailable():
         tray = Tray(window)
         tray.show()

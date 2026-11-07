@@ -3,6 +3,7 @@ from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from tapir.engine import State
+from tapir.i18n import tr
 from tapir.ui.window import STATE_COLORS, MainWindow, state_text
 
 
@@ -27,20 +28,26 @@ class Tray(QSystemTrayIcon):
         super().__init__(self.icons[State.STOPPED], window)
         self.window = window
         self.menu = QMenu()  # kept on self: setContextMenu does not take ownership
-        self.toggle_action = self.menu.addAction("Start", lambda: window.toggle(with_delay=True))
-        self.menu.addAction("Show", lambda: window.handle_command("show"))
+        self.toggle_action = self.menu.addAction("", lambda: window.toggle(with_delay=True))
+        self.show_action = self.menu.addAction("", lambda: window.handle_command("show"))
         self.menu.addSeparator()
-        self.menu.addAction("Quit", QApplication.quit)
+        self.quit_action = self.menu.addAction("", QApplication.quit)
         self.setContextMenu(self.menu)
         self.activated.connect(self._on_activated)
         window.bridge.state_changed.connect(self._show_state, Qt.ConnectionType.QueuedConnection)
-        self._show_state(State.STOPPED, 0)
+        window.language_changed.connect(self._retranslate)
+        self._retranslate()
+
+    def _retranslate(self) -> None:
+        self.show_action.setText(tr("Show"))
+        self.quit_action.setText(tr("Quit"))
+        self._show_state(self.window.state, self.window.countdown)
 
     def _show_state(self, state: str, countdown: int) -> None:
         state = State(state)
         self.setIcon(self.icons[state])
-        self.setToolTip(f"Tapir: {state_text(state, countdown)}")
-        self.toggle_action.setText("Start" if state == State.STOPPED else "Stop")
+        self.setToolTip(tr("Tapir: {state}", state=state_text(state, countdown)))
+        self.toggle_action.setText(tr("Start") if state == State.STOPPED else tr("Stop"))
 
     def _on_activated(self, reason) -> None:
         if reason != QSystemTrayIcon.ActivationReason.Trigger:
