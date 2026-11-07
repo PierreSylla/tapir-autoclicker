@@ -23,10 +23,18 @@ Clicks go through a virtual `uinput` mouse, so they work under any compositor. N
 
 ```
 cd packaging
-makepkg -si
+makepkg -sif
 ```
 
-The PKGBUILD builds the **last commit** of this repository: uncommitted changes, including new files that are not committed yet, are not included. It installs the `tapir` command, the desktop entry and the udev rule, and pacman reloads udev for you.
+The PKGBUILD builds the **last commit** of this repository: uncommitted changes, including new files that are not committed yet, are not included. `-f` rebuilds the package even when one with the same version was built before; without it, makepkg reinstalls the old file. It installs the `tapir` command, the desktop entry and the udev rule, and pacman reloads udev for you.
+
+### With pipx or pip
+
+```
+pipx install tapir-autoclicker
+```
+
+evdev ships no prebuilt wheel, so pip compiles it: you need a C compiler, the Python headers and the kernel headers (Arch: `base-devel`; Debian and Ubuntu: `build-essential python3-dev`). The udev rule and the desktop entry are not installed this way: see Permissions.
 
 ### From source
 
@@ -45,7 +53,7 @@ Tapir creates its virtual mouse through `/dev/uinput` and needs write access to 
 test -w /dev/uinput && echo ok
 ```
 
-If it is not writable, install the udev rule shipped with Tapir. The package does it for you; from source, run:
+If it is not writable, install the udev rule shipped with Tapir. The Arch package does it for you; from source, run:
 
 ```
 scripts/setup-permissions.sh
@@ -55,6 +63,14 @@ The script asks for confirmation, then runs:
 
 ```
 sudo install -Dm644 packaging/70-tapir-uinput.rules /etc/udev/rules.d/70-tapir-uinput.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger --sysname-match=uinput
+```
+
+Without a source checkout (pip install), create the rule directly:
+
+```
+echo 'KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"' | sudo tee /etc/udev/rules.d/70-tapir-uinput.rules
 sudo udevadm control --reload-rules
 sudo udevadm trigger --sysname-match=uinput
 ```
@@ -145,6 +161,17 @@ python -m pytest
 
 `tapir/engine.py` holds the click worker and the virtual mouse (no Qt), `hotkey.py` the hotkey model, Hyprland binds and evdev listener, `ipc.py` the socket and command line, `config.py` the settings file, `i18n.py` the French translations, and `ui/` the window and tray. A test checks that every text passed to `tr()` has a French translation with the same placeholders.
 
+### Releasing
+
+Set the new version in `pyproject.toml` and `pkgver` in `packaging/PKGBUILD`, commit, then push a matching tag:
+
+```
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The *Publish* workflow runs the tests, checks that the tag matches the version in `pyproject.toml`, builds the sdist and wheel and uploads them to PyPI through trusted publishing (no API token is stored anywhere).
+
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT, see [LICENSE](https://github.com/PierreSylla/tapir-autoclicker/blob/main/LICENSE).
