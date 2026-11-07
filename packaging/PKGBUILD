@@ -14,6 +14,8 @@ sha256sums=('SKIP')
 
 build() {
   cd "$pkgname"
+  # makepkg keeps src/ between builds: stale wheels would all match dist/*.whl.
+  rm -rf build dist
   python -m build --wheel --no-isolation
 }
 
